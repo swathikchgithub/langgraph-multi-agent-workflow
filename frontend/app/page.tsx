@@ -77,7 +77,7 @@ function StatusBadge({ label, color }: { label: string; color: 'green' | 'red' |
 }
 
 function PartsResult({ r }: { r: WorkflowResult }) {
-  const part = r.identified_part ?? {};
+  const part = (r.identified_part ?? {}) as Record<string, string>;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ function PartsResult({ r }: { r: WorkflowResult }) {
 }
 
 function EscalationResult({ r }: { r: WorkflowResult }) {
-  const pkg = r.investigation_package ?? {};
+  const pkg = (r.investigation_package ?? {}) as Record<string, string>;
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ function EscalationResult({ r }: { r: WorkflowResult }) {
             {pkg.best_guess && (
               <Row
                 label="Best guess"
-                value={`${String(pkg.best_guess)} (${Math.round(Number(pkg.best_guess_confidence ?? 0) * 100)}%)`}
+                value={`${pkg.best_guess} (${Math.round(Number(pkg.best_guess_confidence ?? 0) * 100)}%)`}
               />
             )}
             {pkg.quarantine_location && (
