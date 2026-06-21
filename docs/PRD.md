@@ -3,19 +3,19 @@
 
 **Version:** 1.0  
 **Date:** 2026-06-20  
-**Status:** In Development
+**Status:** Deployed
 
 ---
 
 ## Problem Statement
 
-At, parts arrive at receiving docks without serial numbers or part numbers. This creates a cascade of failures:
+In manufacturing and assembly operations, parts arrive at receiving docks without serial numbers or part numbers. This creates a cascade of failures:
 
 1. **Receiving can't identify the part** — no part number to look up in the catalog
 2. **Parts can't be routed** — without identification, the correct business unit is unknown
 3. **Parts sit in limbo** — delays assembly, halts production, risks safety compliance
 4. **Business units receive parts without context** — no instructions on what to do, where to store, or who to notify
-5. **Audit trail breaks** — traceability required for safety-critical AV components is lost
+5. **Audit trail breaks** — traceability required for safety-critical components is lost
 
 **Scale of the problem:**
 - ~5% of inbound parts arrive with missing or illegible identification
@@ -62,7 +62,7 @@ A multi-agent AI workflow built on LangGraph that:
 | FR-7 | All decisions are logged with agent name, confidence, and timestamp |
 | FR-8 | Workflow completes in under 30 seconds for 95% of cases |
 | FR-9 | System handles supply chain AND finance queries in a unified interface |
-| FR-10 | CLI interface for demo and testing |
+| FR-10 | CLI and web interface for demo and testing |
 
 ## Non-Functional Requirements
 

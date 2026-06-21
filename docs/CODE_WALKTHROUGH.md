@@ -115,9 +115,10 @@ Return JSON: {"query_type": "...", "next": "..."}
 ## Step 5 — Part Identifier (1 minute)
 
 ```python
-@tool
-def search_catalog(description: str, category: str = None) -> list[dict]:
-    """Fuzzy search the parts catalog. Returns top 5 matches with similarity scores."""
+def search_catalog(description: str, category: str = None) -> str:
+    """Search the parts catalog by description. Returns top matches with similarity scores."""
+    results = search_catalog_fuzzy(description, category)
+    return json.dumps({"matches": results})
 ```
 
 > "The part identifier has access to two tools: catalog search and PO lookup.
@@ -169,26 +170,51 @@ def search_catalog(description: str, category: str = None) -> list[dict]:
 
 ## Live Demo (2 minutes)
 
-Run the CLI:
+**Option A — Web UI (preferred for presentations)**
+
+Open: `https://web-production-81be2.up.railway.app`
+
+Click each example pill in order to show all three workflow paths:
+
+1. *"Silver cylindrical bracket arrived without labels, came with PO-2024-0445"*
+   → Shows: parts identification → serial recovery → routing → action plan
+
+2. *"Which suppliers have the highest defect rates this month?"*
+   → Shows: supply chain agent → structured analysis with flagged suppliers
+
+3. *"What are our biggest cost overruns by part category this quarter?"*
+   → Shows: finance agent → budget vs actuals breakdown
+
+4. *"Combined view of supplier defect rates and spend vs budget"*
+   → Shows: cross-domain → both agents run → synthesizer combines output
+
+5. Type manually: `"Received some kind of mystery part, no idea what it is"`
+   → Shows: escalation path → quarantine instructions → investigation package
+
+**Option B — CLI**
 
 ```bash
-# Parts identification demo
-python main.py --query "Received a metal bracket about 30cm from Acme Forgings, PO-2024-0445"
+cd langgraph-multi-agent-workflow
+source .venv/bin/activate
+
+# Parts identification with PO
+python main.py "Silver cylindrical bracket arrived without labels, came with PO-2024-0445"
 
 # Supply chain query
-python main.py --query "Which suppliers had the highest defect rates last month?"
+python main.py "Which suppliers had the highest defect rates last month?"
 
 # Finance query
-python main.py --query "What is the cost variance for brake components in Q1?"
+python main.py "What is the cost variance for brake components this quarter?"
 
 # Cross-domain
-python main.py --query "How does the defect rate from Acme Forgings correlate with our procurement cost overruns?"
+python main.py "Combined view of supplier defect rates and spend vs budget"
 
-# Escalation demo (low confidence)
-python main.py --query "Received some kind of metal part, no idea what it is"
+# Escalation (low confidence)
+python main.py "Received some mystery metal part, no idea what it is"
+
+# Run all demo scenarios at once
+python main.py --demo
 ```
-
-Show the output structure for each.
 
 ---
 
