@@ -153,7 +153,7 @@ function EscalationResult({ r }: { r: WorkflowResult }) {
             {pkg.best_guess && (
               <Row
                 label="Best guess"
-                value={`${pkg.best_guess} (`}
+                value={`${String(pkg.best_guess)} (${Math.round(Number(pkg.best_guess_confidence ?? 0) * 100)}%)`}
               />
             )}
             {pkg.quarantine_location && (
