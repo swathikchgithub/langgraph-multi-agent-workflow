@@ -1,5 +1,7 @@
 # Multi-Agent Parts Workflow
 
+**Live demo:** [https://web-production-81be2.up.railway.app](https://web-production-81be2.up.railway.app)
+
 A LangGraph-based multi-agent system that identifies untagged parts arriving at the
 warehouse, recovers serial and part numbers from PO records, routes each part to the
 correct business unit, and generates action instructions for the receiving team.
@@ -7,7 +9,7 @@ Also handles supply chain and finance queries.
 
 ## Problem Statement
 
-Parts arrive at without serial numbers or part number labels. Without identification:
+Parts arrive at receiving docks without serial numbers or part number labels. Without identification:
 - Parts can't be routed to the correct business unit
 - Receiving teams don't know how to handle, store, or inspect them
 - Inventory systems can't be updated
