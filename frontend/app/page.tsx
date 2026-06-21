@@ -30,12 +30,53 @@ type WorkflowResult = {
   final_answer: string | null;
 };
 
+type AgentEvent = { agent: string; update: Record<string, unknown> };
+
 const PRIORITY_BADGE: Record<string, string> = {
   critical: 'bg-red-100 text-red-700 border-red-200',
   high: 'bg-orange-100 text-orange-700 border-orange-200',
   normal: 'bg-blue-100 text-blue-700 border-blue-200',
   low: 'bg-gray-100 text-gray-500 border-gray-200',
 };
+
+const AGENT_LABELS: Record<string, string> = {
+  supervisor: 'Supervisor',
+  part_identifier: 'Part Identifier',
+  serial_resolver: 'Serial Resolver',
+  router: 'Router',
+  action_recommender: 'Action Plan',
+  escalation: 'Escalation',
+  supply_chain: 'Supply Chain',
+  finance: 'Finance',
+  synthesizer: 'Synthesizer',
+};
+
+function agentSummary(agent: string, update: Record<string, unknown>): string {
+  switch (agent) {
+    case 'supervisor':
+      return `${String(update.query_type ?? 'unknown')} query`;
+    case 'part_identifier': {
+      const part = update.identified_part as Record<string, string> | null;
+      if (part?.part_number) return `${part.part_number} — ${Math.round(Number(update.identification_confidence ?? 0) * 100)}%`;
+      return 'no catalog match';
+    }
+    case 'serial_resolver':
+      return update.recovered_serial ? String(update.recovered_serial) : 'serial not recovered';
+    case 'router':
+      return update.target_business_unit ? String(update.target_business_unit) : 'routing complete';
+    case 'action_recommender':
+      return 'instructions generated';
+    case 'escalation':
+      return 'escalated — human review required';
+    case 'supply_chain':
+    case 'finance':
+      return 'analysis complete';
+    case 'synthesizer':
+      return 'combined answer ready';
+    default:
+      return 'complete';
+  }
+}
 
 function Pct({ value }: { value: number }) {
   const pct = Math.round(value * 100);
@@ -73,6 +114,30 @@ function StatusBadge({ label, color }: { label: string; color: 'green' | 'red' |
     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${cls}`}>
       {label}
     </span>
+  );
+}
+
+function AgentTrace({ events, loading }: { events: AgentEvent[]; loading: boolean }) {
+  if (events.length === 0 && !loading) return null;
+  return (
+    <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Agent Trace</p>
+      <div className="space-y-2.5">
+        {events.map((e, i) => (
+          <div key={i} className="flex items-start gap-3 text-sm">
+            <span className="text-green-500 text-base leading-none mt-px">✓</span>
+            <span className="font-medium text-gray-700 w-36 shrink-0">{AGENT_LABELS[e.agent] ?? e.agent}</span>
+            <span className="text-gray-400 text-xs mt-0.5">{agentSummary(e.agent, e.update)}</span>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex items-center gap-3">
+            <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin" />
+            <span className="text-gray-400 text-xs">Running next agent…</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -195,27 +260,53 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [trace, setTrace] = useState<AgentEvent[]>([]);
 
   async function submit() {
     if (!query.trim() || loading) return;
     setLoading(true);
     setResult(null);
     setError(null);
+    setTrace([]);
     try {
-      const res = await fetch('/api/query', {
+      const res = await fetch('/api/query/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query.trim() }),
       });
-      const text = await res.text();
-      let data: WorkflowResult;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error(res.ok ? 'Unexpected response from server' : `Server error ${res.status} — the workflow may have timed out. Please try again.`);
+      if (!res.body) throw new Error('No response body');
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() ?? '';
+        for (const part of parts) {
+          for (const line of part.split('\n')) {
+            if (!line.startsWith('data: ')) continue;
+            const text = line.slice(6).trim();
+            if (!text) continue;
+            try {
+              const data = JSON.parse(text);
+              if (data.type === 'agent') {
+                setTrace(prev => [...prev, { agent: data.agent, update: data.update }]);
+              } else if (data.type === 'complete') {
+                setResult(data.result as WorkflowResult);
+              } else if (data.type === 'error') {
+                throw new Error(data.message);
+              }
+            } catch (e) {
+              if (e instanceof SyntaxError) continue;
+              throw e;
+            }
+          }
+        }
       }
-      if (!res.ok) throw new Error((data as unknown as { error?: string }).error ?? `Error ${res.status}`);
-      setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
@@ -264,7 +355,7 @@ export default function Home() {
               disabled={loading || !query.trim()}
               className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Running workflow…' : 'Run workflow'}
+              {loading ? 'Running…' : 'Run workflow'}
             </button>
           </div>
         </div>
@@ -276,9 +367,12 @@ export default function Home() {
           </div>
         )}
 
+        {/* Live agent trace */}
+        <AgentTrace events={trace} loading={loading} />
+
         {/* Result */}
         {result && (
-          <div className="mt-6 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <div className="mt-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
             {result.escalated
               ? <EscalationResult r={result} />
               : result.action_plan
