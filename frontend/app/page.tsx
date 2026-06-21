@@ -207,9 +207,15 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query.trim() }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? `Error ${res.status}`);
-      setResult(data as WorkflowResult);
+      const text = await res.text();
+      let data: WorkflowResult;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(res.ok ? 'Unexpected response from server' : `Server error ${res.status} — the workflow may have timed out. Please try again.`);
+      }
+      if (!res.ok) throw new Error((data as unknown as { error?: string }).error ?? `Error ${res.status}`);
+      setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {

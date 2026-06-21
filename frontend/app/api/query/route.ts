@@ -22,8 +22,13 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify(body),
     });
 
-    const data = await upstream.json();
-    return NextResponse.json(data, { status: upstream.status });
+    const text = await upstream.text();
+    try {
+      const data = JSON.parse(text);
+      return NextResponse.json(data, { status: upstream.status });
+    } catch {
+      return NextResponse.json({ error: `Workflow API returned non-JSON response (status ${upstream.status})` }, { status: 502 });
+    }
   } catch {
     return NextResponse.json({ error: 'Failed to reach workflow API' }, { status: 502 });
   }
