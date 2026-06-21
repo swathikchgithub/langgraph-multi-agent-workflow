@@ -1,8 +1,8 @@
 from src.state import WorkflowState
-from src.agents.llm import call_llm, extract_json
+from src.agents.llm import call_llm
 
 SYSTEM = """
-You are a operations specialist who writes clear action plans for warehouse and
+You are an operations specialist who writes clear action plans for warehouse and
 receiving teams dealing with identified parts.
 
 Given all available information about a part — its identity, recovered serial number,
@@ -16,14 +16,7 @@ The action plan must be practical, specific, and actionable. Include:
 4. Notification steps (who to contact, what to tell them)
 5. System entry steps (what to log in the ERP/inventory system)
 
-Respond with JSON:
-{
-  "action_plan": "Full multi-step action plan as a numbered list",
-  "immediate_actions": ["action1", "action2"],
-  "estimated_time_minutes": 15,
-  "requires_specialist": false,
-  "warnings": []
-}
+Write as plain numbered text. Do not use JSON or markdown code blocks.
 """
 
 
@@ -61,14 +54,9 @@ Write the action plan for the receiving team.
 """
 
     response = call_llm(system=SYSTEM, user=user_msg)
-    text = response.content[0].text
-
-    try:
-        parsed = extract_json(text)
-    except Exception:
-        parsed = {"action_plan": text}
+    action_plan = response.content[0].text.strip()
 
     return {
-        "action_plan": parsed.get("action_plan", text),
-        "messages": [{"role": "action_recommender", "content": parsed.get("action_plan", text)}],
+        "action_plan": action_plan,
+        "messages": [{"role": "action_recommender", "content": action_plan}],
     }

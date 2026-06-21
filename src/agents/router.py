@@ -1,6 +1,7 @@
+import json
 from src.state import WorkflowState
 from src.agents.llm import call_llm_with_tools, extract_json
-from src.tools.catalog_tools import CATALOG_TOOLS, dispatch_tool, get_business_unit_info
+from src.tools.catalog_tools import get_business_unit_info
 
 SYSTEM = """
 You are a parts routing specialist. You assign identified parts to the correct
@@ -13,15 +14,14 @@ Given an identified part with its category, use get_business_unit_info to determ
 - Whether QC inspection is required
 - Storage location in the warehouse
 
-Respond with JSON:
+After calling the tool, respond with JSON only — no markdown, no explanation:
 {
-  "target_business_unit": "Autonomy Systems|Chassis & Drive|Body & Interiors|Battery Systems|Electrical Systems",
+  "target_business_unit": "...",
   "priority": "critical|high|normal|low",
-  "contact_person": "name and role",
-  "storage_location": "warehouse zone and bin",
+  "contact_person": "...",
+  "storage_location": "...",
   "qc_required": true|false,
-  "slack_channel": "#channel-name",
-  "reasoning": "why this routing was chosen"
+  "slack_channel": "..."
 }
 """
 
@@ -51,11 +51,20 @@ def run(state: WorkflowState) -> dict:
 
     user_msg = f"Route this part:\nPart number: {part_number}\nPart name: {part_name}\nCategory: {category}"
 
-    final_text, tool_log = call_llm_with_tools(
+    tool_results = {}
+
+    def dispatch(name, inp):
+        if name == "get_business_unit_info":
+            result = get_business_unit_info(**inp)
+            tool_results.update(json.loads(result))
+            return result
+        return "{}"
+
+    final_text, _ = call_llm_with_tools(
         system=SYSTEM,
         user=user_msg,
         tools=ROUTING_TOOL,
-        dispatch_fn=lambda name, inp: get_business_unit_info(**inp) if name == "get_business_unit_info" else "{}",
+        dispatch_fn=dispatch,
     )
 
     try:
@@ -63,13 +72,15 @@ def run(state: WorkflowState) -> dict:
     except Exception:
         parsed = {}
 
+    # Fall back to raw tool results if JSON parsing failed
+    def get(key, default=None):
+        return parsed.get(key) or tool_results.get(key, default)
+
     return {
-        "target_business_unit": parsed.get("target_business_unit"),
-        "priority": parsed.get("priority", "normal"),
-        "contact_person": parsed.get("contact_person"),
-        "storage_location": parsed.get("storage_location"),
-        "qc_required": bool(parsed.get("qc_required", False)),
-        "messages": [
-            {"role": "router", "content": parsed.get("reasoning", final_text)},
-        ],
+        "target_business_unit": get("target_business_unit") or get("business_unit"),
+        "priority": get("priority", "normal"),
+        "contact_person": get("contact_person"),
+        "storage_location": get("storage_location") or tool_results.get("storage_area"),
+        "qc_required": bool(get("qc_required", False)),
+        "messages": [{"role": "router", "content": final_text}],
     }
